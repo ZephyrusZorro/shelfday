@@ -41,3 +41,4 @@ export type Operation = z.infer<typeof operationSchema>;
 export type Lot = Kitchen['lots'][number];
 export type DayItem = Kitchen['days'][number]['items'][number];
 export type Snapshot = { state: Kitchen; revision: number };
+export const snapshotSchema = z.object({ state: kitchenSchema, revision: z.number().int().nonnegative() });

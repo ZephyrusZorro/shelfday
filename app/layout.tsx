@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./operations-theme.css";
 
 export const metadata: Metadata = {
-  title: "Starter Project",
-  description: "A clean starting point for building your site.",
-  other: {
-    "codex-preview": "development",
-  },
+  title: "Shelfday — Daily kitchen operations",
+  description: "Plan your prep, use ingredients in time, and close the day with every portion accounted for.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

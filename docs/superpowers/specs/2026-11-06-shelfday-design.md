@@ -32,7 +32,7 @@ Server APIs require platform identity and same-origin writes. Never accept a use
 
 ## Experience
 
-Warm paper background, ink typography, forest-green actions, restrained orange expiry cues. Left navigation: Today, Stockroom, Recipes, Activity, Settings. Main view is an actionable prep board, next to an ingredient attention panel. Status and quantities carry meaning. Keyboard-operable dialogs, explicit labels, visible focus, mobile navigation and useful empty states.
+The user rejected the initial earthy theme as too similar to an earlier product. The final direction uses a horizontal navy command bar, cool white workspace, cobalt actions, sharper corners, Work Sans typography and IBM Plex Mono labels. Navigation: Today, Stockroom, Recipes, Activity, Settings. A full-width production schedule sits alongside a dark expiry queue. Mobile uses a compact icon-and-label command bar. Status and quantities carry meaning. Keyboard-operable dialogs, explicit labels, visible focus and useful empty states remain required.
 
 ## Scope and limits
 
