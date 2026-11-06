@@ -51,7 +51,7 @@ test('raw waste checks lot balance and records value', () => {
   const s = fixture();
   const n = op(s, 'stockWaste', { lotId: 'first', quantity: 100, reason: 'Spoiled' });
   assert.equal(n.lots.find((l: any) => l.id === 'first')!.remaining, 400);
-  assert.equal(n.events.at(-1).costCents, 1000);
+  assert.equal(n.events.at(-1)!.costCents, 1000);
   assert.throws(() => op(s, 'stockWaste', { lotId: 'first', quantity: 501, reason: 'Spoiled' }), /remaining/i);
 });
 test('combined shopping demand does not reuse shared ingredients', () => {
