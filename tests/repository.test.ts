@@ -55,3 +55,14 @@ test('HTTP requires identity, same-origin JSON writes and valid body', async () 
   assert.equal(good.status, 200); assert.equal(good.headers.get('cache-control'), 'no-store');
   db.close();
 });
+test('HTTP rejects oversized bodies, unsupported methods and caller-selected identities', async () => {
+  const { repo, db } = open();
+  const headers = { origin: 'https://kitchen.test', 'content-type': 'application/json' };
+  const large = new Request('https://kitchen.test/api/kitchen', { method: 'POST', headers, body: 'x'.repeat(1_800_001) });
+  assert.equal((await handleKitchen(large, 'alice', repo)).status, 413);
+  const wrongMethod = new Request('https://kitchen.test/api/kitchen', { method: 'DELETE' });
+  assert.equal((await handleKitchen(wrongMethod, 'alice', repo)).status, 405);
+  const injected = new Request('https://kitchen.test/api/kitchen', { method: 'POST', headers, body: JSON.stringify({ revision: 0, userId: 'bob', operation }) });
+  assert.equal((await handleKitchen(injected, 'alice', repo)).status, 422);
+  assert.equal((await repo.read('bob')).revision, 0); db.close();
+});

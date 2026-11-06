@@ -2,7 +2,7 @@ import { validateKitchen } from './engine.ts';
 import type { Kitchen } from './model.ts';
 
 export function backupText(state: Kitchen) {
-  return JSON.stringify({ format: 'shelfday-backup', version: 1, exportedAt: new Date().toISOString(), state }, null, 2);
+  return JSON.stringify({ format: 'shelfday-backup', version: 1, exportedAt: new Date().toISOString(), state });
 }
 export function parseBackup(text: string): Kitchen {
   const value = JSON.parse(text);

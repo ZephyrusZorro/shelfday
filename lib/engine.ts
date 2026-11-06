@@ -18,7 +18,7 @@ export function validateKitchen(input: unknown): Kitchen {
   const ingredientIds = new Set(s.ingredients.map(x => x.id)); const recipeIds = new Set(s.recipes.map(x => x.id));
   for (const lot of s.lots) {
     if (!ingredientIds.has(lot.ingredientId)) throw new DomainError('Missing ingredient reference in stock.');
-    if (lot.remaining > lot.quantity || lot.useBy < lot.receivedOn) throw new DomainError('Invalid lot balance or dates.');
+    if (lot.remaining > lot.quantity || lot.useBy < lot.receivedOn || lot.remainingCostCents > lot.totalCostCents || (lot.remaining === 0 && lot.remainingCostCents !== 0)) throw new DomainError('Invalid lot balance, cost or dates.');
   }
   for (const recipe of s.recipes) {
     unique(recipe.ingredients.map(x => x.ingredientId), 'recipe ingredient');
@@ -29,6 +29,7 @@ export function validateKitchen(input: unknown): Kitchen {
     for (const item of day.items) {
       if (!recipeIds.has(item.recipeId)) throw new DomainError('Missing recipe reference in day.');
       if (item.sold + item.wasted > item.prepared || (day.status === 'closed' && item.sold + item.wasted !== item.prepared)) throw new DomainError('Invalid portion balance.');
+      if (item.remainingCostCents < 0 || item.soldCostCents < 0 || item.wasteCostCents < 0 || item.remainingCostCents + item.soldCostCents + item.wasteCostCents !== item.costCents || (item.prepared === item.sold + item.wasted && item.remainingCostCents !== 0)) throw new DomainError('Invalid portion cost balance.');
     }
   }
   return s;
@@ -37,12 +38,17 @@ export function usableLots(s: Kitchen, ingredientId: string, date: string): Lot[
   return s.lots.filter(l => l.ingredientId === ingredientId && l.remaining > 0 && l.useBy >= date && l.receivedOn <= date)
     .sort((a, b) => a.useBy.localeCompare(b.useBy) || a.receivedOn.localeCompare(b.receivedOn) || a.id.localeCompare(b.id));
 }
+function takeLot(lot: Lot, quantity: number): number {
+  const cost = Math.round(lot.remainingCostCents * quantity / lot.remaining);
+  lot.remaining -= quantity; lot.remainingCostCents -= cost;
+  return cost;
+}
 export function applyOperation(input: Kitchen, rawOperation: unknown): Kitchen {
   const op = operationSchema.parse(rawOperation);
   if (input.operationIds.includes(op.id)) return input;
   if (op.type === 'replace') {
     const restored = validateKitchen(op.payload);
-    return { ...restored, operationIds: [...restored.operationIds.filter(x => x !== op.id), op.id] };
+    return validateKitchen({ ...restored, operationIds: [...restored.operationIds.filter(x => x !== op.id), op.id] });
   }
   const s = structuredClone(input);
   const event: Kitchen['events'][number] = { id: op.id, operationId: op.id, date: op.date, type: op.type, label: '', quantity: 0, unit: '', costCents: 0, revenueCents: 0, reason: '' };
@@ -69,7 +75,7 @@ export function applyOperation(input: Kitchen, rawOperation: unknown): Kitchen {
       if (!ingredient) throw new DomainError('Ingredient not found.');
       if (s.lots.some(x => x.id === p.id)) throw new DomainError('This batch already exists.');
       if (p.useBy < op.date) throw new DomainError('Use-by date cannot precede receipt date.');
-      s.lots.push({ id: p.id, ingredientId: p.ingredientId, quantity: p.quantity, remaining: p.quantity, totalCostCents: Math.round(p.totalCost * 100), receivedOn: op.date, useBy: p.useBy, reference: p.reference });
+      s.lots.push({ id: p.id, ingredientId: p.ingredientId, quantity: p.quantity, remaining: p.quantity, totalCostCents: Math.round(p.totalCost * 100), remainingCostCents: Math.round(p.totalCost * 100), receivedOn: op.date, useBy: p.useBy, reference: p.reference });
       event.label = ingredient.name; event.quantity = p.quantity; event.unit = ingredient.unit; event.costCents = Math.round(p.totalCost * 100); break;
     }
     case 'prepare': {
@@ -87,11 +93,11 @@ export function applyOperation(input: Kitchen, rawOperation: unknown): Kitchen {
         }
       }
       let cost = 0;
-      for (const a of allocations) { a.lot.remaining -= a.quantity; cost += a.quantity * a.lot.totalCostCents / a.lot.quantity; }
+      for (const a of allocations) cost += takeLot(a.lot, a.quantity);
       const costCents = Math.round(cost);
       let item = d.items.find(x => x.recipeId === recipe.id);
-      if (!item) { item = { recipeId: recipe.id, name: recipe.name, priceCents: Math.round(recipe.price * 100), costCents: 0, prepared: 0, sold: 0, wasted: 0 }; d.items.push(item); }
-      item.prepared += p.quantity; item.costCents += costCents;
+      if (!item) { item = { recipeId: recipe.id, name: recipe.name, priceCents: Math.round(recipe.price * 100), costCents: 0, remainingCostCents: 0, soldCostCents: 0, wasteCostCents: 0, prepared: 0, sold: 0, wasted: 0 }; d.items.push(item); }
+      item.prepared += p.quantity; item.costCents += costCents; item.remainingCostCents += costCents;
       event.label = recipe.name; event.quantity = p.quantity; event.unit = 'portions'; event.costCents = costCents; break;
     }
     case 'sell':
@@ -99,8 +105,10 @@ export function applyOperation(input: Kitchen, rawOperation: unknown): Kitchen {
       const d = day(), p = op.payload, item = d.items.find(x => x.recipeId === p.recipeId);
       if (!item) throw new DomainError('Prepare this recipe first.');
       if (p.quantity > item.prepared - item.sold - item.wasted) throw new DomainError('Quantity exceeds remaining prepared portions.');
-      if (op.type === 'sell') { item.sold += p.quantity; event.revenueCents = item.priceCents * p.quantity; }
-      else { item.wasted += p.quantity; event.reason = op.payload.reason; event.costCents = Math.round(item.costCents / item.prepared * p.quantity); }
+      const costCents = Math.round(item.remainingCostCents * p.quantity / (item.prepared - item.sold - item.wasted));
+      item.remainingCostCents -= costCents; event.costCents = costCents;
+      if (op.type === 'sell') { item.sold += p.quantity; item.soldCostCents += costCents; event.revenueCents = item.priceCents * p.quantity; }
+      else { item.wasted += p.quantity; item.wasteCostCents += costCents; event.reason = op.payload.reason; }
       event.label = item.name; event.quantity = p.quantity; event.unit = 'portions'; break;
     }
     case 'stockWaste': {
@@ -108,8 +116,8 @@ export function applyOperation(input: Kitchen, rawOperation: unknown): Kitchen {
       if (!lot) throw new DomainError('Batch not found.');
       if (lot.receivedOn > op.date) throw new DomainError('Batch was not received on this date.');
       if (p.quantity > lot.remaining) throw new DomainError('Quantity exceeds remaining batch stock.');
-      lot.remaining -= p.quantity; const ingredient = s.ingredients.find(x => x.id === lot.ingredientId)!;
-      event.label = ingredient.name; event.quantity = p.quantity; event.unit = ingredient.unit; event.reason = p.reason; event.costCents = Math.round(p.quantity * lot.totalCostCents / lot.quantity); break;
+      const costCents = takeLot(lot, p.quantity); const ingredient = s.ingredients.find(x => x.id === lot.ingredientId)!;
+      event.label = ingredient.name; event.quantity = p.quantity; event.unit = ingredient.unit; event.reason = p.reason; event.costCents = costCents; break;
     }
     case 'close': {
       const d = day();

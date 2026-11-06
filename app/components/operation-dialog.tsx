@@ -5,8 +5,8 @@ import { X, Plus, Trash2, ArrowRight, PackageOpen, ShieldCheck, ArrowDownToLine 
 import { planKitchen } from '../../lib/planning';
 import { emptyKitchen } from '../../lib/engine';
 import { sampleKitchen } from '../../lib/demo';
-import type { Modal, ViewProps } from './kitchen-app';
-import { count } from './kitchen-app';
+import type { Modal, ViewProps } from './types';
+import { count } from '../../lib/format';
 
 type Props = ViewProps & { modal: Modal; saving: boolean; error: string; run: (type: string, payload: unknown) => Promise<boolean>; close: () => void; onBackup: () => void; uncertain: boolean; retry: () => void };
 export default function OperationDialog({ modal, state, date, busy, saving, error, run, close, onBackup, uncertain, retry }: Props) {

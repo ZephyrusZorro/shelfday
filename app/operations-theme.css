@@ -1,6 +1,7 @@
 /* The selected operations theme. Layout and component primitives live in globals.css. */
 :root{--paper:#f0f2f7;--ink:#172334;--muted:#677387;--green:#2458ed;--line:#dce2eb;--pale:#edf2ff;--orange:#a25b12;--red:#b84433;--radius:5px}
-body{font-family:'Work Sans',Arial,sans-serif;font-size:14px;color:var(--ink);background:var(--paper)}
+body{font-family:'Work Sans',Arial,sans-serif;font-size:14px;color:var(--ink);background:var(--paper)}.load-screen svg{color:#5579c5}
+.date-switch{display:flex;align-items:center;gap:5px}.date-switch .button{font-size:10px;padding:9px 10px;min-height:42px}.date-switch .date-picker input{max-width:135px}
 h1,h2,h3,.brand,.metrics strong,.prep-progress>strong,.numeric,.new-recipe-card strong{font-family:'Work Sans',Arial,sans-serif}
 h1{font-size:38px;font-weight:650;letter-spacing:-1.7px}h2{font-size:20px;font-weight:650;letter-spacing:-.65px}
 .eyebrow,.nav-caption,.save-status,.prep-table-head,.day-strip>.fine,.recipe-category,.form-section-label,.history-source,.workspace-footer,.count-pill,.tag,.expiry-chip{font-family:'IBM Plex Mono',monospace}

@@ -11,8 +11,13 @@ const nonnegative = z.number().int().min(0).max(100_000_000);
 const money = z.number().finite().min(0).max(1_000_000).refine(v => Math.abs(v * 100 - Math.round(v * 100)) < 1e-6, 'Use at most two decimal places.');
 export const ingredientSchema = z.object({ id, name, unit: z.enum(['g', 'ml', 'each']), par: nonnegative }).strict();
 export const recipeSchema = z.object({ id, name, category: name, price: money, target: z.number().int().min(0).max(10_000), ingredients: z.array(z.object({ ingredientId: id, quantity: qty }).strict()).min(1).max(50) }).strict();
-const lotSchema = z.object({ id, ingredientId: id, quantity: qty, remaining: nonnegative, totalCostCents: nonnegative, receivedOn: dateSchema, useBy: dateSchema, reference: z.string().max(150) }).strict();
-const dayItemSchema = z.object({ recipeId: id, name, priceCents: nonnegative, costCents: nonnegative, prepared: nonnegative, sold: nonnegative, wasted: nonnegative }).strict();
+const lotSchema = z.object({ id, ingredientId: id, quantity: qty, remaining: nonnegative, totalCostCents: nonnegative, remainingCostCents: nonnegative.optional(), receivedOn: dateSchema, useBy: dateSchema, reference: z.string().max(150) }).strict().transform(lot => ({ ...lot, remainingCostCents: lot.remainingCostCents ?? Math.round(lot.totalCostCents * lot.remaining / lot.quantity) }));
+const dayItemSchema = z.object({ recipeId: id, name, priceCents: nonnegative, costCents: nonnegative, remainingCostCents: nonnegative.optional(), soldCostCents: nonnegative.optional(), wasteCostCents: nonnegative.optional(), prepared: nonnegative, sold: nonnegative, wasted: nonnegative }).strict().transform(item => {
+  // Earlier v1 backups predate explicit cost pools. Preserve their balances using rounded proportional estimates.
+  const soldCostCents = item.soldCostCents ?? (item.prepared ? Math.round(item.costCents * item.sold / item.prepared) : 0);
+  const wasteCostCents = item.wasteCostCents ?? Math.min(item.costCents - soldCostCents, item.prepared ? Math.round(item.costCents * item.wasted / item.prepared) : 0);
+  return { ...item, soldCostCents, wasteCostCents, remainingCostCents: item.remainingCostCents ?? item.costCents - soldCostCents - wasteCostCents };
+});
 const daySchema = z.object({ date: dateSchema, status: z.enum(['open', 'closed']), items: z.array(dayItemSchema).max(500) }).strict();
 const eventSchema = z.object({ id, operationId: id, date: dateSchema, type: z.enum(['ingredient', 'recipe', 'receive', 'prepare', 'sell', 'portionWaste', 'stockWaste', 'close', 'settings']), label: z.string().max(250), quantity: nonnegative, unit: z.string().max(20), costCents: nonnegative, revenueCents: nonnegative, reason: z.string().max(150) }).strict();
 export const kitchenSchema = z.object({

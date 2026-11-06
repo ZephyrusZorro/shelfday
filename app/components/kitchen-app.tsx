@@ -2,22 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutDashboard, PackageOpen, BookOpen, History, Settings, ArrowUpRight, Plus, RefreshCw, Sprout, LogOut, Check, LoaderCircle, CircleHelp } from 'lucide-react';
-import type { Kitchen, Snapshot } from '../../lib/model';
-import { snapshotSchema } from '../../lib/model';
+import type { Snapshot } from '../../lib/model';
+import { snapshotSchema, dateSchema } from '../../lib/model';
 import { localDate } from '../../lib/planning';
 import { backupText, activityCsv } from '../../lib/export';
 import { Today, Stockroom, Recipes, Activity, KitchenSettings } from './views';
 import OperationDialog from './operation-dialog';
-
-export type Modal = { type: 'ingredient' | 'receive' | 'recipe' | 'prepare' | 'sell' | 'portionWaste' | 'stockWaste' | 'close' | 'restore' | 'reset' | 'sample' | 'guide'; id?: string; backup?: Kitchen };
-export type ViewProps = { state: Kitchen; date: string; open: (modal: Modal) => void; busy: boolean };
-export function download(text: string, filename: string, type = 'application/json') {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-export function money(cents: number, currency: string) { return new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: 2 }).format(cents / 100); }
-export function count(n: number) { return n.toLocaleString('en'); }
+import type { Modal, ViewProps } from './types';
+import { download } from '../../lib/download';
 const sections = [{ name: 'Today', icon: LayoutDashboard }, { name: 'Stockroom', icon: PackageOpen }, { name: 'Recipes', icon: BookOpen }, { name: 'Activity', icon: History }, { name: 'Settings', icon: Settings }] as const;
 export default function KitchenApp({ displayName }: { displayName: string }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -28,7 +20,7 @@ export default function KitchenApp({ displayName }: { displayName: string }) {
   const pending = useRef<{ revision: number; operation: unknown } | null>(null);
   const reload = useCallback(async () => {
     setLoading(true);
-    try { const response = await fetch('/api/kitchen', { cache: 'no-store' }); const body = await response.json() as { error?: string }; if (!response.ok) throw new Error(body.error || 'Could not open your kitchen.'); setSnapshot(snapshotSchema.parse(body)); setError(''); }
+    try { const response = await fetch('/api/kitchen', { cache: 'no-store', signal: AbortSignal.timeout(20_000) }); const body = await response.json() as { error?: string }; if (!response.ok) throw new Error(body.error || 'Could not open your kitchen.'); const incoming = snapshotSchema.parse(body); setSnapshot(current => !current || incoming.revision >= current.revision ? incoming : current); setError(''); }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not open your kitchen. Check your connection.'); }
     finally { setLoading(false); }
   }, []);
@@ -52,12 +44,12 @@ export default function KitchenApp({ displayName }: { displayName: string }) {
     } finally { setSaving(false); }
   }
   async function run(type: string, payload: unknown) {
-    if (!snapshot || pending.current) return false;
+    if (!snapshot || pending.current || loading) return false;
     return send({ revision: snapshot.revision, operation: { id: crypto.randomUUID(), type, date, payload } });
   }
   function open(next: Modal) { if (!saving && !uncertain) { setError(''); setModal(next); } }
   if (!snapshot || !date) return <main className="load-screen"><Sprout size={40} /><h1>{loading ? 'Opening your kitchen…' : 'Your kitchen is taking a moment.'}</h1>{error && <p role="alert">{error}</p>}{!loading && <button className="button primary" onClick={reload}>Try again</button>}</main>;
-  const state = snapshot.state; const props: ViewProps = { state, date, open, busy: saving || uncertain };
+  const state = snapshot.state; const props: ViewProps = { state, date, open, busy: saving || uncertain || loading };
   const expired = state.lots.filter(l => l.remaining > 0 && l.useBy < date).length;
   return <div className="app-shell">
     <a className="skip-link" href="#main">Skip to workspace</a>
@@ -77,7 +69,7 @@ export default function KitchenApp({ displayName }: { displayName: string }) {
         {state.sample && <div className="sample-banner"><span><strong>Sample kitchen</strong> · These are example records. Explore freely.</span><button onClick={() => open({ type: 'reset' })} disabled={props.busy}>Start my own kitchen <ArrowUpRight size={14} /></button></div>}
         {error && <div className="error-banner" role="alert"><span>{error}</span>{uncertain && <button className="button small" disabled={saving} onClick={() => pending.current && send(pending.current)}>Retry same save</button>}</div>}
         <div className="page-heading"><div><span className="eyebrow">{view === 'Today' ? 'DAILY OPERATIONS' : 'KITCHEN OPERATIONS'}</span><h1>{view === 'Today' ? 'Today’s service.' : view === 'Settings' ? 'Workspace settings.' : view === 'Activity' ? 'The activity ledger.' : view === 'Recipes' ? 'Your production menu.' : 'The stockroom.'}</h1><p>{view === 'Today' ? 'Plan production. Track every batch. Close with the numbers balanced.' : view === 'Stockroom' ? 'Receive, label, and use the earliest batch first.' : view === 'Recipes' ? 'A simple recipe is the link between your shelves and your prep.' : view === 'Activity' ? 'An honest record of what came in, went out, and was left behind.' : 'Your kitchen details and portable records, all in one place.'}</p></div>
-          <div className="heading-actions">{view === 'Today' && <><label className="date-picker"><span className="sr-only">Service date</span><input type="date" value={date} min="2000-01-01" max={localDate()} onChange={e => e.target.value && setDate(e.target.value)} disabled={props.busy} /></label><button className="button primary" onClick={() => open({ type: 'receive' })} disabled={props.busy || !state.ingredients.length}><Plus size={16} />Receive stock</button></>}{view === 'Stockroom' && <><button className="button" onClick={() => open({ type: 'ingredient' })} disabled={props.busy}><Plus size={16} />Ingredient</button><button className="button primary" onClick={() => open({ type: 'receive' })} disabled={props.busy || !state.ingredients.length}><Plus size={16} />Receive stock</button></>}{view === 'Recipes' && <button className="button primary" onClick={() => open({ type: 'recipe' })} disabled={props.busy || !state.ingredients.length}><Plus size={16} />New recipe</button>}{view === 'Activity' && <button className="button" onClick={() => download(activityCsv(state), `shelfday-activity-${date}.csv`, 'text/csv;charset=utf-8')}>Export CSV <ArrowUpRight size={16} /></button>}</div>
+          <div className="heading-actions">{view === 'Today' && <><form className="date-switch" onSubmit={e => { e.preventDefault(); const value = String(new FormData(e.currentTarget).get('date') ?? ''); if (dateSchema.safeParse(value).success && value <= localDate()) { setDate(value); setError(''); } else setError('Choose a valid service date between 2000 and today.'); }}><label className="date-picker"><span className="sr-only">Service date</span><input type="date" name="date" defaultValue={date} key={date} min="2000-01-01" max={localDate()} required disabled={props.busy} /></label><button className="button" disabled={props.busy} aria-label="View selected service date">View</button></form><button className="button primary" onClick={() => open({ type: 'receive' })} disabled={props.busy || !state.ingredients.length || state.days.some(d => d.date === date && d.status === 'closed')}><Plus size={16} />Receive stock</button></>}{view === 'Stockroom' && <><button className="button" onClick={() => open({ type: 'ingredient' })} disabled={props.busy}><Plus size={16} />Ingredient</button><button className="button primary" onClick={() => open({ type: 'receive' })} disabled={props.busy || !state.ingredients.length || state.days.some(d => d.date === date && d.status === 'closed')}><Plus size={16} />Receive stock</button></>}{view === 'Recipes' && <button className="button primary" onClick={() => open({ type: 'recipe' })} disabled={props.busy || !state.ingredients.length}><Plus size={16} />New recipe</button>}{view === 'Activity' && <button className="button" onClick={() => download(activityCsv(state), `shelfday-activity-${date}.csv`, 'text/csv;charset=utf-8')}>Export CSV <ArrowUpRight size={16} /></button>}</div>
         </div>
         {!state.ingredients.length && <div className="onboarding"><div className="onboarding-illustration"><PackageOpen size={48} strokeWidth={1.3} /><span className="illustration-sprout"><Sprout size={26} /></span></div><div><span className="eyebrow">SET UP YOUR WORKSPACE</span><h2>Start with the ingredients.</h2><p>Add an ingredient, receive your first batch, then create a recipe.<br />Shelfday will connect the quantities for you.</p><div className="inline-actions"><button className="button primary" onClick={() => open({ type: 'ingredient' })} disabled={props.busy}>Add first ingredient <Plus size={15} /></button><button className="text-button" onClick={() => open({ type: 'sample' })} disabled={props.busy}>Explore a sample kitchen <ArrowUpRight size={15} /></button></div></div></div>}
         {view === 'Today' && <Today {...props} />}{view === 'Stockroom' && <Stockroom {...props} />}{view === 'Recipes' && <Recipes {...props} />}{view === 'Activity' && <Activity {...props} />}{view === 'Settings' && <KitchenSettings {...props} run={run} />}

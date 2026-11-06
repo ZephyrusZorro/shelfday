@@ -35,6 +35,6 @@ export async function handleKitchen(request: Request, userId: string | null, rep
     if (error instanceof DomainError) return json({ error: error.message }, 422);
     if (error instanceof z.ZodError) return json({ error: error.issues.slice(0, 3).map(i => `${i.path.join('.')}: ${i.message}`).join('; ') }, 422);
     if (error instanceof SyntaxError) return json({ error: 'Could not read this data. Use a valid Shelfday JSON backup.' }, 400);
-    return json({ error: 'The kitchen could not be saved. Your current data is unchanged. Refresh and try again.' }, 500);
+    return json({ error: 'Save could not be confirmed. Retry this same entry before making another change.' }, 500);
   }
 }
