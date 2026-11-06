@@ -34,7 +34,11 @@ An independent reviewer reproduced the initial waste-cost and backup-limit bugs.
 - Search of generated production output found **no** `local_seedy` or `seedy@sites.test` development identity strings.
 - Post-upgrade browser check on 7 November: the earlier kitchen survived process restart and schema compatibility parsing. Selecting 6 November loaded 27 prepared / 26 sold / 1 waste and the locked closed-day controls. Date filtering now requires the explicit View action and validates dates before changing the workspace.
 - A second connected browser workflow received 100 g of rice, prepared 3 bowls, sold 2, recorded 1 waste at INR 10, and closed 7 November. Ingredient stock carried forward from the earlier service. Export CSV produced a downloadable file.
-- Private hosting and GitHub CI results will be appended after the native deployment and CI runs finish. An expected URL alone is not deployment evidence.
+- [GitHub CI run 42276248379](https://github.com/ZephyrusZorro/shelfday/actions/runs/42276248379) completed successfully for code commit `6c6ce68efa7171532581ae3fce52b6c5b9b4073a`. Local HEAD and remote main matched, and GitHub associated the commit author with `ZephyrusZorro`.
+- The Sites source helper verified the same pushed code commit and packaged its build output. Native private deployment returned **succeeded**, version 1, with [the live URL](https://shelfday-kitchen.roaneasel4.chatgpt.site). Deployment ID: `appgdep_6aee24eae5d8819180b64fd99130ef1f`.
+- Hosted D1 overview returned binding `DB` and table `kitchen_docs`, confirming the migration was applied.
+- The live browser entry point displayed the platform's **Log in to access** gate; Continue with ChatGPT reached the real OpenAI sign-in page. No credentials were supplied. The authenticated hosted workflow therefore remains **unverified**; the complete connected workflow is verified locally. Private access was preserved.
+- The final documentation commit records delivery results after deployment. It changes documentation only; deployed application code remains the verified code commit above.
 
 ## Not established
 

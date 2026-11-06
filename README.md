@@ -2,6 +2,10 @@
 
 A daily prep, perishable-stock and closing workbench for independent cafés and takeaway kitchens.
 
+**[Open the private live app](https://shelfday-kitchen.roaneasel4.chatgpt.site)** · [GitHub Actions](https://github.com/ZephyrusZorro/shelfday/actions)
+
+The hosted instance requires the owner's ChatGPT sign-in. Source is public; kitchen data remains private. Local browser acceptance passed; a signed-in hosted user journey has not been exercised in this browser session.
+
 **For owner-operated cafés, bakeries and takeaway kitchens.** Connect the first delivery to the last portion: receive batches, plan preparation, record sales and waste, and close a reconciled day.
 
 ## The daily loop
